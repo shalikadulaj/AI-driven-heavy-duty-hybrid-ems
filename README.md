@@ -113,6 +113,19 @@ braking preference, thermal fallback, synthetic environment transitions, and
 Double-DQN training. Simulation results must be generated only after the plant
 parameters and drive-cycle provenance are recorded in `artifacts/`.
 
+The repository includes a clearly labeled synthetic training curve and
+evaluation summary under `artifacts/`. Generate them reproducibly with:
+
+```powershell
+python scripts/generate_results.py --episodes 100 --seed 2026
+```
+
+![Synthetic Double-DQN training curve](artifacts/double_dqn_training_curve.png)
+
+This graph is a software-pipeline demonstration, not a measured truck
+performance graph. A real performance graph requires a calibrated plant or
+vehicle/HIL data and must report confidence intervals and baseline controllers.
+
 ## Real-truck deployment gate
 
 The controller must not be connected directly to actuators from this repository.
