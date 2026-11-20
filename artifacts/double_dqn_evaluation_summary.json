@@ -1,5 +1,5 @@
 {
-  "algorithm": "constrained Double-DQN",
+  "algorithm": "constrained dueling prioritized Double-DQN",
   "environment": "SyntheticEMSEnv",
   "training_episodes": 100,
   "training_seed": 2026,

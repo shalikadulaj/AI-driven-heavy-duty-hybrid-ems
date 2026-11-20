@@ -77,10 +77,11 @@ verification report, driver/maintenance procedures, and regulatory approval.
 
 ## Implemented and recommended deep-RL architecture
 
-The repository includes a dependency-light NumPy Double-DQN prototype. It is
-intended to verify the training interface and safety-shield integration. It
-does not represent a calibrated truck, and its synthetic training results
-must not be used as evidence of real-vehicle performance.
+The repository includes a dependency-light NumPy dueling prioritized
+Double-DQN prototype. It is intended to verify the training interface and
+safety-shield integration. It does not represent a calibrated truck, and its
+synthetic training results must not be used as evidence of real-vehicle
+performance.
 
 For the next plant-backed stage, use a continuous-action constrained SAC or TD3 actor for a proposed motor
 torque fraction, with observations normalized from measured signals and route

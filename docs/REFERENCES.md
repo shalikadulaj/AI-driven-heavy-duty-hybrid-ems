@@ -97,18 +97,43 @@ publisher-indexed records where available.
    Relevance: TD3-style delayed policy updates and clipped double critics for
    continuous control.
 
+11. **Wang, Z., Schaul, T., Hessel, M., van Hasselt, H., Lanctot, M., &
+    de Freitas, N. (2016).** Dueling network architectures for deep
+    reinforcement learning. *Proceedings of the 33rd International Conference
+    on Machine Learning*, PMLR 48, 1995–2003.
+    [PMLR record](https://proceedings.mlr.press/v48/wangf16.html)
+
+    Relevance: separates state value and action advantage; the current
+    Double-DQN network uses this architecture for discrete torque actions.
+
+12. **Schaul, T., Quan, J., Antonoglou, I., & Silver, D. (2016).** Prioritized
+    experience replay. *International Conference on Learning Representations*.
+    [OpenReview record](https://openreview.net/forum?id=H1Dy---0Z)
+
+    Relevance: prioritizes high-error transitions; the current replay buffer
+    includes priority sampling and importance weights.
+
+13. **Achiam, J., Held, D., Tamar, A., & Abbeel, P. (2017).** Constrained
+    policy optimization. *Proceedings of the 34th International Conference on
+    Machine Learning*, PMLR 70, 22–31.
+    [PMLR record](https://proceedings.mlr.press/v70/achiam17a.html)
+
+    Relevance: principled constrained-RL formulation. This repository’s
+    deterministic safety shield is not CPO and provides no formal safety
+    guarantee.
+
 ## Engineering standards and interfaces
 
 These are authoritative engineering references, not peer-reviewed research
 papers:
 
-11. **ISO 26262:2018, Road vehicles — Functional safety.**
+14. **ISO 26262:2018, Road vehicles — Functional safety.**
    [ISO publication page](https://www.iso.org/publication/PUB200262.html)
 
    Relevance: safety lifecycle and safety-related electrical/electronic
    systems. Compliance cannot be inferred from this research repository.
 
-12. **SAE J1939_202603, Serial Control and Communications Heavy-Duty Vehicle
+15. **SAE J1939_202603, Serial Control and Communications Heavy-Duty Vehicle
    Network — Top-Level Document.**
    [SAE record](https://doi.org/10.4271/J1939_202603)
 

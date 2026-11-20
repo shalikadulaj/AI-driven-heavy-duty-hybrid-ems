@@ -51,13 +51,15 @@ lower-level certified torque controller.
 - thermal/SoC fallback,
 - policy-action clamping before actuator-facing output.
 
-This repository also includes an executable **NumPy Double-DQN prototype** in
+This repository also includes an executable **NumPy dueling prioritized
+Double-DQN prototype** in
 `src/global_ems/rl.py`. It contains a replay buffer, neural Q-network,
-online/target networks, Double-DQN target selection, epsilon-greedy
-exploration, checkpoint save/load, a synthetic EMS environment, and policy
-integration with the deterministic safety shield. Eleven discrete actions
-represent normalized rear e-axle torque proposals. The synthetic environment
-is a software test harness, not a calibrated truck.
+online/target networks, Double-DQN target selection, dueling value/advantage
+heads, prioritized replay with importance weights, epsilon-greedy exploration,
+checkpoint save/load, a synthetic EMS environment, and policy integration with
+the deterministic safety shield. Eleven discrete actions represent normalized
+rear e-axle torque proposals. The synthetic environment is a software test
+harness, not a calibrated truck.
 
 A suitable plant-backed research path is:
 
@@ -121,6 +123,8 @@ python scripts/generate_results.py --episodes 100 --seed 2026
 ```
 
 ![Synthetic Double-DQN training curve](artifacts/double_dqn_training_curve.png)
+
+![Synthetic Double-DQN performance dashboard](artifacts/double_dqn_performance_dashboard.png)
 
 This graph is a software-pipeline demonstration, not a measured truck
 performance graph. A real performance graph requires a calibrated plant or

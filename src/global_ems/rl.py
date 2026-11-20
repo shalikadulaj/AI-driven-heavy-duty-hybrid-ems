@@ -53,37 +53,51 @@ def measurement_observation(measurement: EMSMeasurement) -> np.ndarray:
 
 
 class ReplayBuffer:
-    """Fixed-size replay memory with deterministic NumPy sampling."""
+    """Prioritized replay memory with importance-sampling correction."""
 
     def __init__(self, capacity: int = 100_000, seed: int = 0) -> None:
         if capacity < 1:
             raise ValueError("capacity must be positive")
         self._data: Deque[tuple[np.ndarray, int, float, np.ndarray, bool]] = deque(maxlen=capacity)
+        self._priorities: Deque[float] = deque(maxlen=capacity)
         self._rng = np.random.default_rng(seed)
 
     def add(self, state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) -> None:
         self._data.append((state.copy(), int(action), float(reward), next_state.copy(), bool(done)))
+        self._priorities.append(max(self._priorities, default=1.0))
 
-    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def sample(
+        self, batch_size: int, alpha: float = 0.6, beta: float = 0.4
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         if len(self._data) < batch_size:
             raise ValueError("not enough transitions in replay buffer")
-        indices = self._rng.choice(len(self._data), size=batch_size, replace=False)
+        priorities = np.asarray(self._priorities, dtype=np.float64) ** alpha
+        probabilities = priorities / priorities.sum()
+        indices = self._rng.choice(len(self._data), size=batch_size, replace=False, p=probabilities)
         batch = [self._data[int(index)] for index in indices]
         states, actions, rewards, next_states, dones = zip(*batch)
+        importance = (len(self._data) * probabilities[indices]) ** (-beta)
+        importance /= importance.max()
         return (
             np.asarray(states, dtype=np.float32),
             np.asarray(actions, dtype=np.int64),
             np.asarray(rewards, dtype=np.float32),
             np.asarray(next_states, dtype=np.float32),
             np.asarray(dones, dtype=np.float32),
+            np.asarray(indices, dtype=np.int64),
+            np.asarray(importance, dtype=np.float32),
         )
+
+    def update_priorities(self, indices: np.ndarray, priorities: np.ndarray) -> None:
+        for index, priority in zip(indices, priorities):
+            self._priorities[int(index)] = max(float(priority), 1.0e-6)
 
     def __len__(self) -> int:
         return len(self._data)
 
 
 class MLPQNetwork:
-    """Small NumPy MLP used to keep the reference trainer dependency-light."""
+    """Dependency-light dueling MLP Q-network."""
 
     def __init__(self, input_size: int, output_size: int, hidden_size: int = 64, seed: int = 0) -> None:
         rng = np.random.default_rng(seed)
@@ -93,6 +107,8 @@ class MLPQNetwork:
             np.zeros(hidden_size, dtype=np.float32),
             rng.normal(0.0, np.sqrt(2.0 / hidden_size), (hidden_size, hidden_size)).astype(np.float32),
             np.zeros(hidden_size, dtype=np.float32),
+            rng.normal(0.0, np.sqrt(2.0 / hidden_size), (hidden_size, 1)).astype(np.float32),
+            np.zeros(1, dtype=np.float32),
             rng.normal(0.0, np.sqrt(2.0 / hidden_size), (hidden_size, output_size)).astype(np.float32),
             np.zeros(output_size, dtype=np.float32),
         ]
@@ -100,22 +116,38 @@ class MLPQNetwork:
     def predict(self, states: np.ndarray) -> np.ndarray:
         hidden1 = np.tanh(states @ self.weights[0] + self.weights[1])
         hidden2 = np.tanh(hidden1 @ self.weights[2] + self.weights[3])
-        return hidden2 @ self.weights[4] + self.weights[5]
+        value = hidden2 @ self.weights[4] + self.weights[5]
+        advantage = hidden2 @ self.weights[6] + self.weights[7]
+        return value + advantage - advantage.mean(axis=1, keepdims=True)
 
-    def train_batch(self, states: np.ndarray, actions: np.ndarray, targets: np.ndarray, learning_rate: float) -> float:
+    def train_batch(
+        self,
+        states: np.ndarray,
+        actions: np.ndarray,
+        targets: np.ndarray,
+        learning_rate: float,
+        sample_weights: np.ndarray,
+    ) -> tuple[float, np.ndarray]:
         hidden1 = np.tanh(states @ self.weights[0] + self.weights[1])
         hidden2 = np.tanh(hidden1 @ self.weights[2] + self.weights[3])
-        output = hidden2 @ self.weights[4] + self.weights[5]
+        value = hidden2 @ self.weights[4] + self.weights[5]
+        advantage = hidden2 @ self.weights[6] + self.weights[7]
+        output = value + advantage - advantage.mean(axis=1, keepdims=True)
         selected = output[np.arange(len(actions)), actions]
         error = selected - targets
         absolute_error = np.abs(error)
-        loss = float(np.mean(np.where(absolute_error <= 1.0, 0.5 * error**2, absolute_error - 0.5)))
-        gradient = np.clip(error, -1.0, 1.0) / max(len(actions), 1)
-        output_gradient = np.zeros_like(output)
-        output_gradient[np.arange(len(actions)), actions] = gradient
-        grad_w5 = hidden2.T @ output_gradient
-        grad_b5 = output_gradient.sum(axis=0)
-        grad_h2 = output_gradient @ self.weights[4].T
+        huber = np.where(absolute_error <= 1.0, 0.5 * error**2, absolute_error - 0.5)
+        loss = float(np.sum(sample_weights * huber) / max(sample_weights.sum(), 1.0e-6))
+        gradient = sample_weights * np.clip(error, -1.0, 1.0) / max(sample_weights.sum(), 1.0e-6)
+        selected_gradient = np.zeros_like(output)
+        selected_gradient[np.arange(len(actions)), actions] = gradient
+        value_gradient = selected_gradient.sum(axis=1, keepdims=True)
+        advantage_gradient = selected_gradient - selected_gradient.mean(axis=1, keepdims=True)
+        grad_wv = hidden2.T @ value_gradient
+        grad_bv = value_gradient.sum(axis=0)
+        grad_wa = hidden2.T @ advantage_gradient
+        grad_ba = advantage_gradient.sum(axis=0)
+        grad_h2 = value_gradient @ self.weights[4].T + advantage_gradient @ self.weights[6].T
         grad_z2 = grad_h2 * (1.0 - hidden2**2)
         grad_w3 = hidden1.T @ grad_z2
         grad_b3 = grad_z2.sum(axis=0)
@@ -123,13 +155,13 @@ class MLPQNetwork:
         grad_z1 = grad_h1 * (1.0 - hidden1**2)
         grad_w1 = states.T @ grad_z1
         grad_b1 = grad_z1.sum(axis=0)
-        gradients = (grad_w1, grad_b1, grad_w3, grad_b3, grad_w5, grad_b5)
+        gradients = (grad_w1, grad_b1, grad_w3, grad_b3, grad_wv, grad_bv, grad_wa, grad_ba)
         for index, gradient_value in enumerate(gradients):
             self.weights[index] -= learning_rate * np.clip(gradient_value, -5.0, 5.0)
-        return loss
+        return loss, error
 
     def copy(self) -> "MLPQNetwork":
-        clone = MLPQNetwork(self.weights[0].shape[0], self.weights[4].shape[1], self.weights[0].shape[1])
+        clone = MLPQNetwork(self.weights[0].shape[0], self.weights[6].shape[1], self.weights[0].shape[1])
         clone.weights = [weight.copy() for weight in self.weights]
         return clone
 
@@ -144,6 +176,8 @@ class RLConfig:
     epsilon_start: float = 1.0
     epsilon_end: float = 0.05
     epsilon_decay_steps: int = 20_000
+    replay_alpha: float = 0.6
+    replay_beta: float = 0.4
 
 
 class ConstrainedDoubleDQN:
@@ -180,12 +214,17 @@ class ConstrainedDoubleDQN:
     def train_step(self) -> float | None:
         if len(self.replay) < max(self.config.batch_size, self.config.warmup_steps):
             return None
-        states, actions, rewards, next_states, dones = self.replay.sample(self.config.batch_size)
+        states, actions, rewards, next_states, dones, indices, sample_weights = self.replay.sample(
+            self.config.batch_size, self.config.replay_alpha, self.config.replay_beta
+        )
         online_next = self.online.predict(next_states)
         next_actions = np.argmax(online_next, axis=1)
         target_next = self.target.predict(next_states)[np.arange(len(next_actions)), next_actions]
         targets = rewards + self.config.gamma * (1.0 - dones) * target_next
-        loss = self.online.train_batch(states, actions, targets, self.config.learning_rate)
+        loss, errors = self.online.train_batch(
+            states, actions, targets, self.config.learning_rate, sample_weights
+        )
+        self.replay.update_priorities(indices, np.abs(errors) + 1.0e-5)
         if self.steps % self.config.target_update_interval == 0:
             self.target = self.online.copy()
         return loss
@@ -199,7 +238,7 @@ class ConstrainedDoubleDQN:
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(path, *self.online.weights)
         path.with_suffix(".json").write_text(json.dumps({
-            "algorithm": "constrained_double_dqn",
+            "algorithm": "constrained_dueling_prioritized_double_dqn",
             "observation_size": OBSERVATION_SIZE,
             "action_fractions": ACTION_FRACTIONS.tolist(),
             "steps": self.steps,
@@ -271,7 +310,16 @@ class SyntheticEMSEnv:
         self.previous_torque = torque
         self.step_index += 1
         done = self.step_index >= self.horizon
-        info = {"torque_nm": torque, "soc_pct": self.soc_pct, "battery_temp_c": self.battery_temp_c, "reward": reward}
+        info = {
+            "torque_nm": torque,
+            "soc_pct": self.soc_pct,
+            "battery_temp_c": self.battery_temp_c,
+            "motor_temp_c": self.motor_temp_c,
+            "inverter_temp_c": self.inverter_temp_c,
+            "friction_brake_request_pct": command.friction_brake_request_pct,
+            "fallback_active": float(command.fallback_active),
+            "reward": reward,
+        }
         return measurement_observation(self._measurement()), float(reward), done, info
 
     def _measurement(self) -> EMSMeasurement:

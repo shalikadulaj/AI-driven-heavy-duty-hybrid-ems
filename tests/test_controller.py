@@ -62,7 +62,7 @@ def test_synthetic_environment_exposes_all_discrete_actions():
     assert "torque_nm" in info
 
 
-def test_double_dqn_trains_and_proposes_through_safety_shield():
+def test_double_dqn_trains_and_proposes_through_safety_shield(tmp_path):
     agent, returns = train_double_dqn(episodes=2, seed=8)
     assert len(returns) == 2
     env = SyntheticEMSEnv(horizon=1, seed=9)
@@ -70,3 +70,8 @@ def test_double_dqn_trains_and_proposes_through_safety_shield():
     command = agent.propose_command(env._measurement())
     assert -3000.0 <= command.motor_torque_nm <= 3000.0
     assert isinstance(agent, ConstrainedDoubleDQN)
+    checkpoint = tmp_path / "policy.npz"
+    agent.save(checkpoint)
+    restored = ConstrainedDoubleDQN.load(checkpoint)
+    observation = env.reset()
+    assert restored.select_action(observation) == agent.select_action(observation)

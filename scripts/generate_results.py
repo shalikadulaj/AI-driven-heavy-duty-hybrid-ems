@@ -26,6 +26,7 @@ def main() -> None:
     agent, returns = train_double_dqn(episodes=args.episodes, seed=args.seed)
     evaluation_returns: list[float] = []
     evaluation_fallbacks: list[int] = []
+    representative_trace: list[dict[str, float]] = []
     for seed in range(args.seed, args.seed + 10):
         env = SyntheticEMSEnv(seed=seed)
         observation = env.reset()
@@ -37,6 +38,17 @@ def main() -> None:
             observation, reward, done, info = env.step(action)
             total += reward
             fallbacks += int(info["battery_temp_c"] >= 45.0)
+            if seed == args.seed:
+                representative_trace.append({
+                    "step": float(len(representative_trace)),
+                    "soc_pct": info["soc_pct"],
+                    "battery_temp_c": info["battery_temp_c"],
+                    "motor_temp_c": info["motor_temp_c"],
+                    "inverter_temp_c": info["inverter_temp_c"],
+                    "torque_nm": info["torque_nm"],
+                    "friction_brake_request_pct": info["friction_brake_request_pct"],
+                    "reward": info["reward"],
+                })
         evaluation_returns.append(total)
         evaluation_fallbacks.append(fallbacks)
 
@@ -45,7 +57,7 @@ def main() -> None:
         writer.writerow(["episode", "return"])
         writer.writerows((index, value) for index, value in enumerate(returns, start=1))
     summary = {
-        "algorithm": "constrained Double-DQN",
+        "algorithm": "constrained dueling prioritized Double-DQN",
         "environment": "SyntheticEMSEnv",
         "training_episodes": args.episodes,
         "training_seed": args.seed,
@@ -58,6 +70,10 @@ def main() -> None:
     (args.output / "double_dqn_evaluation_summary.json").write_text(
         __import__("json").dumps(summary, indent=2), encoding="utf-8"
     )
+    with (args.output / "double_dqn_representative_trace.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(representative_trace[0]))
+        writer.writeheader()
+        writer.writerows(representative_trace)
 
     import matplotlib
 
@@ -76,6 +92,37 @@ def main() -> None:
     axis.legend(frameon=False)
     figure.tight_layout()
     figure.savefig(args.output / "double_dqn_training_curve.png", dpi=180)
+    plt.close(figure)
+    figure, axes = plt.subplots(2, 2, figsize=(12, 8))
+    axes = axes.ravel()
+    axes[0].errorbar(
+        ["evaluation"],
+        [np.mean(evaluation_returns)],
+        yerr=[np.std(evaluation_returns, ddof=1)],
+        fmt="o",
+        capsize=5,
+    )
+    axes[0].set_title("Fixed-seed evaluation return")
+    axes[0].set_ylabel("Return")
+    axes[1].plot([row["step"] for row in representative_trace], [row["soc_pct"] for row in representative_trace])
+    axes[1].set_title("Representative SoC trajectory")
+    axes[1].set_ylabel("SoC (%)")
+    axes[2].plot([row["step"] for row in representative_trace], [row["battery_temp_c"] for row in representative_trace], label="Battery")
+    axes[2].plot([row["step"] for row in representative_trace], [row["motor_temp_c"] for row in representative_trace], label="Motor")
+    axes[2].plot([row["step"] for row in representative_trace], [row["inverter_temp_c"] for row in representative_trace], label="Inverter")
+    axes[2].set_title("Representative thermal trajectory")
+    axes[2].set_ylabel("Temperature (deg C)")
+    axes[2].legend(frameon=False, fontsize=8)
+    axes[3].plot([row["step"] for row in representative_trace], [row["torque_nm"] for row in representative_trace], label="Motor torque")
+    axes[3].plot([row["step"] for row in representative_trace], [row["friction_brake_request_pct"] * 30 for row in representative_trace], label="Brake request x30")
+    axes[3].set_title("Torque and friction-brake coordination")
+    axes[3].set_ylabel("Torque / scaled brake")
+    for axis in axes:
+        axis.grid(alpha=0.25)
+        axis.set_xlabel("Step")
+    figure.suptitle("Constrained Double-DQN EMS evaluation (synthetic environment)")
+    figure.tight_layout()
+    figure.savefig(args.output / "double_dqn_performance_dashboard.png", dpi=180)
     plt.close(figure)
     print(summary)
 
