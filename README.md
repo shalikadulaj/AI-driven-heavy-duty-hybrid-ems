@@ -123,7 +123,7 @@ cybersecurity controls, watchdogs, redundant plausibility checks, fallback
 control, driver override, logging, calibration, and approval under the
 applicable vehicle and functional-safety processes.
 
-## Scientific basis
+## Scientific basis and references
 
 The following peer-reviewed papers motivate health-aware and learning-based
 energy management. They do **not** provide truck-specific parameters for this
@@ -146,6 +146,12 @@ repository:
    Learning with Double Q-learning.” *Proceedings of the AAAI Conference on
    Artificial Intelligence*, 30(1). DOI:
    [10.1609/aaai.v30i1.10295](https://doi.org/10.1609/aaai.v30i1.10295).
+
+The complete evidence map and engineering standards are in
+[docs/REFERENCES.md](docs/REFERENCES.md); BibTeX entries are in
+[docs/references.bib](docs/references.bib). The references are used to
+motivate methods and validation requirements; they are not sources of
+truck-specific component ratings or battery-life coefficients.
 
 ## Scope and limitations
 
