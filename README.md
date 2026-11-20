@@ -51,8 +51,15 @@ lower-level certified torque controller.
 - thermal/SoC fallback,
 - policy-action clamping before actuator-facing output.
 
-This is deliberately a safe research interface, not deep reinforcement
-learning yet. A suitable research path is:
+This repository also includes an executable **NumPy Double-DQN prototype** in
+`src/global_ems/rl.py`. It contains a replay buffer, neural Q-network,
+online/target networks, Double-DQN target selection, epsilon-greedy
+exploration, checkpoint save/load, a synthetic EMS environment, and policy
+integration with the deterministic safety shield. Eleven discrete actions
+represent normalized rear e-axle torque proposals. The synthetic environment
+is a software test harness, not a calibrated truck.
+
+A suitable plant-backed research path is:
 
 1. identify and validate the truck plant and sensors;
 2. train a constrained SAC or TD3 policy in randomized simulation;
@@ -95,10 +102,16 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
+To run a short software-level Double-DQN experiment:
+
+```powershell
+python -c "from global_ems.rl import train_double_dqn; agent, returns = train_double_dqn(episodes=20, seed=2026); print(returns[-1]); agent.save('artifacts/double_dqn_policy.npz')"
+```
+
 The current tests exercise measurement validation, bounded torque, regenerative
-braking preference, and thermal fallback. Simulation results must be generated
-only after the plant parameters and drive-cycle provenance are recorded in
-`artifacts/`.
+braking preference, thermal fallback, synthetic environment transitions, and
+Double-DQN training. Simulation results must be generated only after the plant
+parameters and drive-cycle provenance are recorded in `artifacts/`.
 
 ## Real-truck deployment gate
 

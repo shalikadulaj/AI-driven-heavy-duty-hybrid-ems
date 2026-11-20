@@ -12,6 +12,7 @@ dependencies = ["numpy>=1.26"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+rl = ["numpy>=1.26"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

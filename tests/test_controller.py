@@ -1,6 +1,7 @@
 import pytest
 
 from global_ems import ConstrainedEMSController, EMSMeasurement
+from global_ems.rl import ConstrainedDoubleDQN, SyntheticEMSEnv, train_double_dqn
 
 
 def measurement(**overrides: object) -> EMSMeasurement:
@@ -51,3 +52,21 @@ def test_thermal_limit_forces_safe_fallback():
 def test_invalid_measurement_is_rejected():
     with pytest.raises(ValueError):
         ConstrainedEMSController().propose(measurement(battery_soc_pct=120.0))
+
+
+def test_synthetic_environment_exposes_all_discrete_actions():
+    env = SyntheticEMSEnv(horizon=3, seed=4)
+    state = env.reset()
+    assert state.shape == (17,)
+    _, _, _, info = env.step(5)
+    assert "torque_nm" in info
+
+
+def test_double_dqn_trains_and_proposes_through_safety_shield():
+    agent, returns = train_double_dqn(episodes=2, seed=8)
+    assert len(returns) == 2
+    env = SyntheticEMSEnv(horizon=1, seed=9)
+    env.reset()
+    command = agent.propose_command(env._measurement())
+    assert -3000.0 <= command.motor_torque_nm <= 3000.0
+    assert isinstance(agent, ConstrainedDoubleDQN)

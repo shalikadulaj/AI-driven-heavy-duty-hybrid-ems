@@ -75,9 +75,14 @@ Complete the applicable hazard analysis, FMEA/FMEDA, cybersecurity threat
 analysis, software quality process, calibration management, traceability,
 verification report, driver/maintenance procedures, and regulatory approval.
 
-## Recommended deep-RL architecture
+## Implemented and recommended deep-RL architecture
 
-Use a continuous-action constrained SAC or TD3 actor for a proposed motor
+The repository includes a dependency-light NumPy Double-DQN prototype. It is
+intended to verify the training interface and safety-shield integration. It
+does not represent a calibrated truck, and its synthetic training results
+must not be used as evidence of real-vehicle performance.
+
+For the next plant-backed stage, use a continuous-action constrained SAC or TD3 actor for a proposed motor
 torque fraction, with observations normalized from measured signals and route
 preview. Train with domain randomization over mass, grade, road load,
 component efficiency, battery temperature, sensor noise, latency, and
