@@ -47,7 +47,9 @@ lower-level certified torque controller.
 - typed CAN/J1939/DAQ measurement schema,
 - explicit safety limits and multi-objective weights,
 - bounded candidate torque search,
+- accelerator-intent and signed wheel-torque demand gating,
 - regenerative/friction-brake blending,
+- finite-value and physical-envelope measurement validation,
 - thermal/SoC fallback,
 - policy-action clamping before actuator-facing output.
 
@@ -110,8 +112,9 @@ To run a short software-level Double-DQN experiment:
 python -c "from global_ems.rl import train_double_dqn; agent, returns = train_double_dqn(episodes=20, seed=2026); print(returns[-1]); agent.save('artifacts/double_dqn_policy.npz')"
 ```
 
-The current tests exercise measurement validation, bounded torque, regenerative
-braking preference, thermal fallback, synthetic environment transitions, and
+The current tests exercise measurement validation (including non-finite sensor
+rejection), driver-intent torque gating, demand-limited regeneration, thermal
+fallback, synthetic environment transitions, checkpoint round-tripping, and
 Double-DQN training. Simulation results must be generated only after the plant
 parameters and drive-cycle provenance are recorded in `artifacts/`.
 
@@ -129,6 +132,12 @@ python scripts/generate_results.py --episodes 100 --seed 2026
 This graph is a software-pipeline demonstration, not a measured truck
 performance graph. A real performance graph requires a calibrated plant or
 vehicle/HIL data and must report confidence intervals and baseline controllers.
+
+The latest reproducible software-harness run (100 training episodes, seed
+2026, 10 evaluation episodes) reports mean return **-64.04**, standard
+deviation **12.77**, and mean safety-fallback count **0.0**. This changed after
+correcting signed braking demand and fallback accounting; it is not evidence
+of fuel economy, battery life, durability, or safety on a real vehicle.
 
 ## Real-truck deployment gate
 

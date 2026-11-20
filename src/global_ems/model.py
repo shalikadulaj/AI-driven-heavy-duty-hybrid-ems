@@ -37,6 +37,24 @@ class EMSMeasurement:
 
     def validate(self) -> None:
         """Reject impossible or unsafe sensor values before control."""
+        finite_ranges = (
+            ("timestamp_s", self.timestamp_s, 0.0, float("inf")),
+            ("vehicle_speed_kph", self.vehicle_speed_kph, 0.0, 200.0),
+            ("vehicle_acceleration_m_s2", self.vehicle_acceleration_m_s2, -20.0, 20.0),
+            ("engine_speed_rpm", self.engine_speed_rpm, 0.0, 10_000.0),
+            ("battery_voltage_v", self.battery_voltage_v, 0.001, 2_000.0),
+            ("battery_current_a", self.battery_current_a, -10_000.0, 10_000.0),
+            ("battery_temperature_c", self.battery_temperature_c, -80.0, 150.0),
+            ("inverter_temperature_c", self.inverter_temperature_c, -80.0, 200.0),
+            ("motor_temperature_c", self.motor_temperature_c, -80.0, 250.0),
+            ("dc_bus_voltage_v", self.dc_bus_voltage_v, 0.001, 2_000.0),
+            ("wheel_torque_request_nm", self.wheel_torque_request_nm, -20_000.0, 20_000.0),
+            ("previous_motor_torque_nm", self.previous_motor_torque_nm, -20_000.0, 20_000.0),
+            ("previous_motor_torque_rate_nm_s", self.previous_motor_torque_rate_nm_s, -100_000.0, 100_000.0),
+        )
+        for name, value, lower, upper in finite_ranges:
+            if not math.isfinite(value) or not lower <= value <= upper:
+                raise ValueError(f"{name} must be finite and in [{lower}, {upper}]")
         bounded = (
             ("engine_load_pct", self.engine_load_pct, 0.0, 100.0),
             ("accelerator_pct", self.accelerator_pct, 0.0, 100.0),
@@ -47,10 +65,8 @@ class EMSMeasurement:
         for name, value, lower, upper in bounded:
             if not math.isfinite(value) or not lower <= value <= upper:
                 raise ValueError(f"{name} must be finite and in [{lower}, {upper}]")
-        if self.vehicle_speed_kph < 0.0 or self.vehicle_gear < 0:
-            raise ValueError("speed and gear must be non-negative")
-        if self.battery_voltage_v <= 0.0 or self.dc_bus_voltage_v <= 0.0:
-            raise ValueError("battery and DC-bus voltage must be positive")
+        if not 0 <= self.vehicle_gear <= 20:
+            raise ValueError("vehicle_gear must be in [0, 20]")
 
 
 @dataclass(frozen=True)

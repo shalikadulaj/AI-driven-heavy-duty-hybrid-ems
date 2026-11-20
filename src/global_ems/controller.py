@@ -67,13 +67,16 @@ class ConstrainedEMSController:
         measurement: EMSMeasurement,
         policy_torque_nm: float | None,
     ) -> tuple[float, ...]:
-        lower = -self.limits.maximum_regenerative_torque_nm
-        upper = self.limits.maximum_motor_torque_nm
+        braking_demand_nm = max(0.0, -measurement.wheel_torque_request_nm)
+        lower = -min(self.limits.maximum_regenerative_torque_nm, braking_demand_nm)
+        upper = min(self.limits.maximum_motor_torque_nm, measurement.wheel_torque_request_nm)
+        if measurement.accelerator_pct <= 0.0 or measurement.wheel_torque_request_nm <= 0.0:
+            upper = 0.0
         if measurement.battery_soc_pct <= self.limits.minimum_soc_pct:
             lower = 0.0
         if measurement.battery_soc_pct >= self.limits.maximum_soc_pct:
             lower = 0.0
-        if measurement.brake_pct <= 0.0:
+        if measurement.brake_pct <= 0.0 or braking_demand_nm <= 0.0:
             lower = 0.0
         rate = self.limits.maximum_motor_torque_rate_nm_s
         lower = max(lower, measurement.previous_motor_torque_nm - rate)
@@ -128,7 +131,10 @@ class ConstrainedEMSController:
     def _friction_brake_request(self, measurement: EMSMeasurement, regenerative_torque_nm: float) -> float:
         if measurement.brake_pct <= 0.0:
             return 0.0
-        regen_fraction = min(1.0, regenerative_torque_nm / max(self.limits.maximum_regenerative_torque_nm, 1.0))
+        braking_demand_nm = max(0.0, -measurement.wheel_torque_request_nm)
+        if braking_demand_nm <= 0.0:
+            return measurement.brake_pct
+        regen_fraction = min(1.0, regenerative_torque_nm / braking_demand_nm)
         return max(0.0, measurement.brake_pct * (1.0 - regen_fraction))
 
     def _fallback(self, measurement: EMSMeasurement, reason: str) -> ControllerCommand:

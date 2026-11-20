@@ -34,12 +34,26 @@ def test_controller_returns_bounded_propulsion_command():
     assert not command.fallback_active
 
 
+def test_released_accelerator_cannot_request_propulsion():
+    command = ConstrainedEMSController().propose(
+        measurement(accelerator_pct=0.0, wheel_torque_request_nm=1200.0),
+        policy_torque_nm=3000.0,
+    )
+    assert command.motor_torque_nm == 0.0
+
+
 def test_braking_prefers_regeneration_before_friction_brakes():
     command = ConstrainedEMSController().propose(
         measurement(brake_pct=70.0, wheel_torque_request_nm=-1000.0),
     )
     assert command.regenerative_torque_nm > 0.0
+    assert command.regenerative_torque_nm <= 1000.0
     assert command.friction_brake_request_pct < 70.0
+
+
+def test_nan_sensor_value_is_rejected():
+    with pytest.raises(ValueError):
+        ConstrainedEMSController().propose(measurement(motor_temperature_c=float("nan")))
 
 
 def test_thermal_limit_forces_safe_fallback():
@@ -75,3 +89,4 @@ def test_double_dqn_trains_and_proposes_through_safety_shield(tmp_path):
     restored = ConstrainedDoubleDQN.load(checkpoint)
     observation = env.reset()
     assert restored.select_action(observation) == agent.select_action(observation)
+    assert restored.steps == agent.steps

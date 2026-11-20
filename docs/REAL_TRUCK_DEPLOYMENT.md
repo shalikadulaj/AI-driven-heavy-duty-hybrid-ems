@@ -100,6 +100,12 @@ The runtime stack should be:
 6. lower-level motor torque controller;
 7. watchdog, fallback, driver override, and immutable event log.
 
+The current software shield rejects non-finite or out-of-envelope measurement
+values, blocks propulsion when accelerator intent or signed wheel-torque demand
+is absent, and limits regenerative torque to signed braking demand. These are
+research safeguards only; approved vehicle-specific limits and independent
+safety validation remain mandatory.
+
 The policy objective should be evaluated as a Pareto set or constrained
 optimization, not one arbitrary reward number. Report fuel-equivalent use,
 SoC balance, battery throughput, SoH proxy, thermal exposure, motor torque

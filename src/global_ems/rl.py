@@ -251,6 +251,10 @@ class ConstrainedDoubleDQN:
         archive = np.load(path)
         policy.online.weights = [archive[key] for key in sorted(archive.files, key=lambda value: int(value[4:]))]
         policy.target = policy.online.copy()
+        metadata_path = path.with_suffix(".json")
+        if metadata_path.exists():
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            policy.steps = int(metadata.get("steps", 0))
         return policy
 
 
@@ -326,6 +330,11 @@ class SyntheticEMSEnv:
         target_speed = 55.0 + 15.0 * np.sin(self.step_index / 17.0)
         brake = float(np.clip((self.speed_kph - target_speed) / 15.0, 0.0, 1.0) * 100.0)
         accelerator = 0.0 if brake > 0.0 else 45.0
+        wheel_torque_request = (
+            -float(np.clip((self.speed_kph - target_speed) * 120.0, 0.0, 2_000.0))
+            if brake > 0.0
+            else 1200.0 + 400.0 * np.sin(self.step_index / 9.0)
+        )
         return EMSMeasurement(
             timestamp_s=float(self.step_index),
             vehicle_speed_kph=self.speed_kph,
@@ -343,7 +352,7 @@ class SyntheticEMSEnv:
             inverter_temperature_c=self.inverter_temp_c,
             motor_temperature_c=self.motor_temp_c,
             dc_bus_voltage_v=650.0,
-            wheel_torque_request_nm=1200.0 + 400.0 * np.sin(self.step_index / 9.0),
+            wheel_torque_request_nm=wheel_torque_request,
             previous_motor_torque_nm=self.previous_torque,
         )
 

@@ -4,8 +4,8 @@
   "training_episodes": 100,
   "training_seed": 2026,
   "evaluation_episodes": 10,
-  "mean_evaluation_return": -75.24188699760118,
-  "std_evaluation_return": 14.486479197436466,
+  "mean_evaluation_return": -64.03957094338567,
+  "std_evaluation_return": 12.771743007549347,
   "mean_fallback_count": 0.0,
   "interpretation": "software-harness result only; not truck measurement"
 }

@@ -37,7 +37,7 @@ def main() -> None:
             action = agent.select_action(observation)
             observation, reward, done, info = env.step(action)
             total += reward
-            fallbacks += int(info["battery_temp_c"] >= 45.0)
+            fallbacks += int(info["fallback_active"])
             if seed == args.seed:
                 representative_trace.append({
                     "step": float(len(representative_trace)),
